@@ -8,6 +8,7 @@ RUN set -xe \
     && apt-get install -y mysql-client 
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
-EXPOSE 8080
+# Port 81
+EXPOSE 81
 ENTRYPOINT [ "python3" ]
 CMD [ "app.py" ]

@@ -1,19 +1,69 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<center>
-	<font color="DodgerBlue" size="5" style="font-family: avenir">
-		<body style="background: {{ color }};">
-			<h1>The employee {{ name }} wassuccessfully added to the database</h1><br>
-			<h2>The Employee has been added to the database</h2><br>
-			<h2>{{ name }}</h2><br>
-			<title>Add Emp Output</title>
-			<a href="{{ url_for('home') }}">Back</a>
-		</body>
-	</font>
-</center>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            background-image: url("{{ url_for('static', filename='bg.jpg') }}");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center center;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        .overlay {
+            background: rgba(0, 0, 0, 0.55);
+            min-height: 100vh;
+            padding: 40px;
+        }
+        .app-title {
+            font-size: 26px;
+            color: #ff9dff;
+            font-weight: bold;
+        }
+        .card {
+            max-width: 550px;
+            margin: 60px auto;
+            padding: 25px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 8px;
+            text-align: center;
+        }
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 4px;
+            background-color: #ff66cc;
+            color: white;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #ff4ab7;
+        }
+    </style>
 </head>
-<body>
 
+<body>
+<div class="overlay">
+    <h3 class="app-title">{{ title }}</h3>
+
+    <div class="card">
+        {% if name %}
+            <h2>Employee {{ name }} Added Successfully!</h2>
+        {% else %}
+            <h2>Employee Added.</h2>
+        {% endif %}
+
+        <form action="{{ url_for('home') }}">
+            <button class="btn">Add Another</button>
+        </form>
+        <br>
+        <form action="{{ url_for('GetEmp') }}">
+            <button class="btn">Search Employee</button>
+        </form>
+    </div>
+</div>
 </body>
 </html>
