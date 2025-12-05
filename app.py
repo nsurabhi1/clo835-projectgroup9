@@ -6,7 +6,7 @@ import boto3
 app = Flask(__name__)
 
 # --- Config ---
-DBHOST = os.environ.get("DBHOST") or "localhost"
+DBHOST = os.environ.get("DBHOST") or "mysql"
 DBUSER = os.environ.get("DBUSER") or "root"
 DBPWD = os.environ.get("DBPWD") or "password"
 DATABASE = os.environ.get("DATABASE") or "employees"
@@ -31,16 +31,26 @@ def download_background_image():
             print("Download successful.")
         except Exception as e:
             print(f"S3 Error: {e}")
+    else:
+        print("S3_BUCKET or S3_IMAGE_KEY not set; skipping background download.")
 
+# Run once at startup
 download_background_image()
 
 # --- DB Connection ---
 db_conn = None
 try:
-    db_conn = connections.Connection(host=DBHOST, port=DBPORT, user=DBUSER, password=DBPWD, db=DATABASE)
+    db_conn = connections.Connection(
+        host=DBHOST,
+        port=DBPORT,
+        user=DBUSER,
+        password=DBPWD,
+        db=DATABASE
+    )
     print("Database connection initiated.")
 except Exception as e:
     print(f"Database connection failed: {e}")
+    db_conn = None
 
 # --- Routes ---
 @app.route("/", methods=['GET', 'POST'])
@@ -55,18 +65,41 @@ def AddEmp():
     primary_skill = request.form['primary_skill']
     location = request.form['location']
     full_name = ""
-    
-    if db_conn:
-        cursor = db_conn.cursor()
-        try:
-            insert_sql = "INSERT INTO employee VALUES (%s, %s, %s, %s, %s)"
-            cursor.execute(insert_sql, (emp_id, first_name, last_name, primary_skill, location))
-            db_conn.commit()
-            full_name = f"{first_name} {last_name}"
-        finally:
-            cursor.close()
-            
+
+    if not db_conn:
+        # DB connection never established
+        print("ERROR: db_conn is None. Check DBHOST/DBUSER/DBPWD/DATABASE/DBPORT.")
+        return render_template(
+            'addempoutput.html',
+            name="",
+            title=APP_TITLE,
+            error="Database connection is not available."
+        )
+
+    cursor = db_conn.cursor()
+    try:
+        insert_sql = """
+            INSERT INTO employee (emp_id, first_name, last_name, primary_skill, location)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(insert_sql, (emp_id, first_name, last_name, primary_skill, location))
+        db_conn.commit()
+        full_name = f"{first_name} {last_name}"
+        print(f"Inserted employee {emp_id} - {full_name}")
+    except Exception as e:
+        db_conn.rollback()
+        print("ERROR inserting employee:", e)
+        return render_template(
+            'addempoutput.html',
+            name="",
+            title=APP_TITLE,
+            error=f"Error adding employee: {e}"
+        )
+    finally:
+        cursor.close()
+
     return render_template('addempoutput.html', name=full_name, title=APP_TITLE)
+
 
 @app.route("/getemp", methods=['GET', 'POST'])
 def GetEmp():
@@ -76,26 +109,33 @@ def GetEmp():
 def FetchData():
     emp_id = request.form['emp_id']
     output = {}
-    
+
     if db_conn:
         cursor = db_conn.cursor()
         try:
-            select_sql = "SELECT * from employee where emp_id=%s"
-            cursor.execute(select_sql, (emp_id))
+            select_sql = "SELECT * FROM employee WHERE emp_id=%s"
+            cursor.execute(select_sql, (emp_id,))
+
             result = cursor.fetchone()
+
             if result:
                 output["id"] = result[0]
                 output["fname"] = result[1]
                 output["lname"] = result[2]
-                output["interest"] = result[3]
+                output["skill"] = result[3]   # template expects {{ skill }}
                 output["location"] = result[4]
+
         except Exception as e:
-            print(e)
+            print("ERROR:", e)
         finally:
             cursor.close()
-            
+    else:
+        print("ERROR: db_conn is None in FetchData")
+
     return render_template("getempoutput.html", **output, title=APP_TITLE)
 
-if __name__ == '__main__':
-    # Task 1.6: Port 81
-    app.run(host='0.0.0.0', port=81, debug=True)
+
+# --- IMPORTANT: keep server running ---
+if __name__ == "__main__":
+    # In Docker/K8s this will run and keep the container alive
+    app.run(host="0.0.0.0", port=81)
